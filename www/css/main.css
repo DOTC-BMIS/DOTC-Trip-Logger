@@ -1,0 +1,153 @@
+*{
+	padding: 0px;
+	margin: 0px;
+	-webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+#dotc_header{
+	width: 100%;
+	height: auto;
+	background-color: #272626;
+	z-index: 99;
+	position: absolute;
+	top: 0;
+	left: 0;
+}
+
+#dotc_vehicle_info{
+	background-color: #272626;
+	width: 100%;
+	height: auto;
+	color: #fff;
+	font-size: 11px;
+	font-weight: bold;
+	padding: 2px;
+}
+
+#dotc_header_logo{
+	margin: 0.5%;
+}
+
+#dotc_triplogger{
+	position: absolute;
+	top: 0.5%;
+	right: 2%;
+	text-decoration: none;
+	font-weight: bold;
+	font-size: 10px;
+	color: blue;
+}
+
+#dotc_registration{
+	padding-top: 6.5%;
+}
+
+#dotc_passengers input[type=text], #dotc_passengers select, #dotc_passengers textarea, #dotc_reports input[type=text], #dotc_reports select, #dotc_reports textarea, #dotc_stops input[type=text], #dotc_stops select, #dotc_stops textarea, #dotc_registration input{
+	font-size: 11px;
+	padding: 5px;
+	border: 1px solid #bdbdbd;
+	min-width: 45%;
+}
+
+#dotc_passengers a, #dotc_reports a, #dotc_stops a, #dotc_registration a{
+	text-decoration: none;
+	padding: 5px;
+	font-size: 11px;
+	color: #fff;
+	background-color: #565757;
+	margin-top: 3px;
+	margin-bottom: 3px;
+}
+
+#dotc_passengers table tr th, #dotc_reports table tr th, #dotc_stops table tr th, #dotc_registration table tr th{
+	font-size: 12px;
+}
+
+#dotc_passengers table tr td, #dotc_reports table tr td, #dotc_stops table tr td, #dotc_registration table tr th{
+	padding: 5px;
+	font-size: 11px;
+}
+
+#dotc_passengers, #dotc_reports, #dotc_stops{
+	margin-top: 100px;
+}
+
+#dotc_registration{
+	margin-top: 9%;
+}
+
+#dotc_footer{
+	width: 100%;
+	height: auto;
+	background-color: #272626;
+	z-index: 99;
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	padding-top: 0.5%;
+	padding-bottom: 0.5%;
+}
+
+#dotc_footer a{
+	visibility: hidden;
+}
+
+#dotc_footer a, #dotc_footer img{
+	text-decoration: none;
+}
+
+#dotc_reports_button{
+	margin-left: 5%;
+	margin-right: 5%;
+}
+
+#dotc_map{
+	width: 100%;
+	height: 100%;
+	z-index: 1;
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 1;
+}
+
+.center{
+	margin-left: auto;
+	margin-right: auto;
+	text-align: center;
+}
+
+.dotc_header{
+	padding: 3px;
+	text-align: center;
+}
+
+.hidden{
+	display: none;
+}
+
+.left{
+	float: left;
+}
+
+#ajax_loader{
+	position: absolute;
+	display: block;
+	overflow: hidden;
+	background-color:rgba(250,250,250,0.9);
+	top: 0px;
+	left: 0px;
+	width: 100%;
+	height: 100%;
+	z-index: 9999;
+}
+
+#ajax_loader img{
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 31px;
+	height: 31px;
+	margin-top: -15px; /* Half the height */
+	margin-left: -15px; /* Half the width */
+}

@@ -108,6 +108,8 @@ $(function(){
 							} else if( navigator.device ) {
 								navigator.device.exitApp();
 							}
+							
+							// dotc.LoggerTicker( false );
 						}
 					}
 				}, false );

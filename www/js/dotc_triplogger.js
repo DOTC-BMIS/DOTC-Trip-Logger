@@ -439,6 +439,7 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 					}
 					// _this.LoggerTicker( false );
 				}
+				_this.trip_logger.to_send = [];
 				_this.trip_logger.send_limit = 60;
 			}
 		);

@@ -1,7 +1,7 @@
 var DOTC_TripLogger = function(){
-	this.node_ip = 'http://c2.eacomm.com:3001/';
+	this.node_ip = 'http://c3.eacomm.com:3001/';
 	// this.node_ip = 'http://192.168.1.36:3000/';
-	this.node_lookup = 'http://c2.eacomm.com:3000/';
+	this.node_lookup = 'http://c3.eacomm.com:3000/';
 	this.app_keys = {
 		_public : 'f5fd4a451cdc20dc3c62bef36a0d20b658405464',
 		_private : '0c5976a31764f7496f058a5cffc6bdb169ec2d8f'
@@ -439,6 +439,7 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 					}
 					// _this.LoggerTicker( false );
 				}
+				_this.trip_logger.coordinates = [];
 				_this.trip_logger.to_send = [];
 				_this.trip_logger.send_limit = 60;
 			}

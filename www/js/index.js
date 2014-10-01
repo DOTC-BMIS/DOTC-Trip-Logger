@@ -61,6 +61,7 @@ $(function(){
 			if( !dotc.NoInternetConnection() ){
 				dotc.LoadForms();
 				dotc.LoadCredentials();
+				dotc.BATCHSEND();
 				
 				$( '#dotc_header_logo' ).click(function(){
 					dotc.BackToMap();

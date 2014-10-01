@@ -89,6 +89,10 @@ var DOTC_TripLogger = function(){
 	this.saveAjax = false;
 	
 	this.LoggerTicker();
+	
+	this.batchSend = [];
+	this.batchSendCtr = 0;
+	this.batchSendSent = 0;
 }
 
 DOTC_TripLogger.prototype.NoInternetConnection = function( prompt ){
@@ -413,16 +417,59 @@ DOTC_TripLogger.prototype.StopTripLog = function(){
 	alert( 'Trip Logger Stopped' );
 }
 
+DOTC_TripLogger.prototype.BATCHSEND = function(){
+	var _this = this;
+	setInterval(function(){
+		if( _this.batchSend.length > 0 ){
+			// alert( _this.batchSend.length + ' - ' + _this.batchSend[Object.keys( _this.batchSend )[0]].length + ' ' + Object.keys( _this.batchSend ) );
+			if( _this.saveAjax ){
+				_this.saveAjax.abort();
+			}
+			var _iSend = _this.batchSend[Object.keys( _this.batchSend )[0]];
+			
+			_this.saveAjax = $.post(
+				_this.node_ip + 'SaveTripLog',
+				{
+					id : _iSend.id,
+					user_id : _iSend.user_id,
+					trip_name : _iSend.trip_name,
+					coordinates : _iSend.data
+				}, function( data ){
+					if( exitApp ){
+						_this.Loader();
+						if( navigator.app ){
+							navigator.app.exitApp();
+						} else if( navigator.device ) {
+							navigator.device.exitApp();
+						}
+						delete _this.batchSend[Object.keys( _this.batchSend )[0]];
+						// _this.LoggerTicker( false );
+					}
+				}
+			);
+		}
+	}, 20000 );
+}
+
 DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 	var _this = this;
 	var exitApp = typeof exitApp == 'undefined' ? false : true;
 	if( this.trip_logger.to_send.length > 0 && !_this.NoInternetConnection( false ) ){
-		if( this.saveAjax ){
+		/*if( this.saveAjax ){
 			this.trip_logger.send_limit += 60;
 			this.saveAjax.abort();
-		}
+		}*/
+		
+		_this.batchSend[_this.batchSendCtr] = {
+			data : _this.trip_logger.to_send,
+			id : _this.trip_logger.id,
+			user_id : _this.user.id,
+			trip_name : _this.trip_logger.name
+		};
+		_this.batchSendCtr++;
+		_this.trip_logger.to_send = [];
 	
-		this.saveAjax = $.post(
+		/*this.saveAjax = $.post(
 			_this.node_ip + 'SaveTripLog',
 			{
 				id : _this.trip_logger.id,
@@ -443,7 +490,7 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 				_this.trip_logger.to_send = [];
 				_this.trip_logger.send_limit = 60;
 			}
-		);
+		);*/
 	}
 }
 

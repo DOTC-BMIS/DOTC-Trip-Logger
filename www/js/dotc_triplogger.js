@@ -93,6 +93,7 @@ var DOTC_TripLogger = function(){
 	this.batchSend = [];
 	this.batchSendCtr = 0;
 	this.batchSendSent = 0;
+	this.batchSentCtr = 0;
 }
 
 DOTC_TripLogger.prototype.NoInternetConnection = function( prompt ){
@@ -435,20 +436,17 @@ DOTC_TripLogger.prototype.BATCHSEND = function(){
 					trip_name : _iSend.trip_name,
 					coordinates : _iSend.data
 				}, function( data ){
-					if( exitApp ){
-						_this.Loader();
-						if( navigator.app ){
-							navigator.app.exitApp();
-						} else if( navigator.device ) {
-							navigator.device.exitApp();
-						}
-						delete _this.batchSend[Object.keys( _this.batchSend )[0]];
-						// _this.LoggerTicker( false );
+					_this.batchSentCtr++;
+					
+					var _key = Object.keys( _this.batchSend )[0];
+					delete _this.batchSend[_key];
+					if( _this.batchSend.indexOf( _key ) > - 1 ){
+						_this.batchSend.splice( _this.batchSend.indexOf( _key ), 1 );
 					}
 				}
 			);
 		}
-	}, 20000 );
+	}, 10000 );
 }
 
 DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
@@ -516,18 +514,14 @@ DOTC_TripLogger.prototype.TripLogTrail = function(){
 				watchID : ''
 			};
 			
-			if( _this.trip_logger.id > 0 ){
-				_this.trip_logger.coordinates.push( m_position );
-				_this.trip_logger.to_send.push( m_position );
-			}
+			_this.trip_logger.coordinates.push( m_position );
+			_this.trip_logger.to_send.push( m_position );
 			
 			// every minute
 			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
 				_this.SaveTripLog();
 			}
-		}, function(){
-		
-		}, { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true });
+		});
 	}, 1000 );
 }
 
@@ -730,6 +724,8 @@ DOTC_TripLogger.prototype.WatchPosition = function(){
 DOTC_TripLogger.prototype.CurrentPosition = function(){
 	var _this = this;
 	this._timeoutPosition = setInterval(function(){
+		$( '#current_coordinates' ).html( _this.position.latitude + ', ' + _this.position.longitude + ' (' + _this.batchSentCtr + '/' + _this.batchSend.length + ')' );
+	
 		var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
 		if( _this.userMarker ){
 			_this.userMarker.setPosition( _location );

@@ -500,7 +500,30 @@ DOTC_TripLogger.prototype.TripLogTrail = function(){
 		var path = _this.trip_logger.poly.getPath();
 		path.push( _location );
 		
-		navigator.geolocation.getCurrentPosition(function( position ){
+		var m_position = {
+			latitude : _this.position.latitude,
+			longitude : _this.position.longitude,
+			accuracy : _this.position.accuracy,
+			altitudeAccuracy : _this.position.altitudeAccuracy,
+			heading : _this.position.heading,
+			speed : _this.position.speed,
+			timestamp : moment().format( 'X' ),
+			seconds : _this.running_time.seconds,
+			current_dt : moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat ),
+			watchID : ''
+		};
+		
+		if( _this.trip_logger.id > 0 ){
+			_this.trip_logger.coordinates.push( m_position );
+			_this.trip_logger.to_send.push( m_position );
+			
+			// every minute
+			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
+				_this.SaveTripLog();
+			}
+		}
+		
+		/*navigator.geolocation.getCurrentPosition(function( position ){
 			var m_position = {
 				latitude : position.coords.latitude,
 				longitude : position.coords.longitude,
@@ -521,7 +544,9 @@ DOTC_TripLogger.prototype.TripLogTrail = function(){
 			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
 				_this.SaveTripLog();
 			}
-		});
+		}, function(){
+		
+		}, { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true });*/
 	}, 1000 );
 }
 

@@ -512,18 +512,22 @@ DOTC_TripLogger.prototype.TripLogTrail = function(){
 				speed : position.coords.speed,
 				timestamp : moment().format( 'X' ),
 				seconds : _this.running_time.seconds,
-				current_dt : moment().format( _this.dateformat ),
+				current_dt : moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat ),
 				watchID : ''
 			};
 			
-			_this.trip_logger.coordinates.push( m_position );
-			_this.trip_logger.to_send.push( m_position );
+			if( _this.trip_logger.id > 0 ){
+				_this.trip_logger.coordinates.push( m_position );
+				_this.trip_logger.to_send.push( m_position );
+			}
 			
 			// every minute
 			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
 				_this.SaveTripLog();
 			}
-		});
+		}, function(){
+		
+		}, { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true });
 	}, 1000 );
 }
 

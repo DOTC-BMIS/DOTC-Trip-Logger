@@ -1,3 +1,28 @@
+if (typeof Number.prototype.toPrecisionFixed == 'undefined') {
+  Number.prototype.toPrecisionFixed = function(precision) {
+    
+    // use standard toPrecision method
+    var n = this.toPrecision(precision);
+    
+    // ... but replace +ve exponential format with trailing zeros
+    n = n.replace(/(.+)e\+(.+)/, function(n, sig, exp) {
+      sig = sig.replace(/\./, '');       // remove decimal from significand
+      l = sig.length - 1;
+      while (exp-- > l) sig = sig + '0'; // append zeros from exponent
+      return sig;
+    });
+    
+    // ... and replace -ve exponential format with leading zeros
+    n = n.replace(/(.+)e-(.+)/, function(n, sig, exp) {
+      sig = sig.replace(/\./, '');       // remove decimal from significand
+      while (exp-- > 1) sig = '0' + sig; // prepend zeros from exponent
+      return '0.' + sig;
+    });
+    
+    return n;
+  }
+}
+
 var DOTC_TripLogger = function(){
 	this.node_ip = 'http://c3.eacomm.com:3001/';
 	// this.node_ip = 'http://192.168.1.36:3000/';
@@ -94,6 +119,10 @@ var DOTC_TripLogger = function(){
 	this.batchSendCtr = 0;
 	this.batchSendSent = 0;
 	this.batchSentCtr = 0;
+	this.SpeedLimit = 200;
+	this.DistanceLimit = 0.60;
+	this.CurrentDistance = 0;
+	this.CurrentSpeed = 0;
 }
 
 DOTC_TripLogger.prototype.NoInternetConnection = function( prompt ){
@@ -492,14 +521,32 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 	}
 }
 
+DOTC_TripLogger.prototype.DistanceTo = function(point_a, point_b, poprecision) {
+  // default 4 sig figs reflects typical 0.3% accuracy of spherical model
+  if (typeof precision == 'undefined') precision = 4;
+  
+  var R = 6371;
+  // var lat1 = this._lat.toRad(), lon1 = this._lon.toRad();
+  // var lat2 = point._lat.toRad(), lon2 = point._lon.toRad();
+  var lat1 = point_a._lat * Math.PI / 180, lon1 = point_a._lon * Math.PI / 180;
+  var lat2 = point_b._lat * Math.PI / 180, lon2 = point_b._lon * Math.PI / 180;
+  var dLat = lat2 - lat1;
+  var dLon = lon2 - lon1;
+
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1) * Math.cos(lat2) * 
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  var d = R * c;
+  
+  return d.toPrecisionFixed( precision );
+}
+
 DOTC_TripLogger.prototype.TripLogTrail = function(){
 	var _this = this;
 	_this.trip_logger.IntervalTimeout = setInterval(function(){
 		var _last = _this.trip_logger.coordinates[( _this.trip_logger.coordinates.length - 1 )];
-		var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
-		var path = _this.trip_logger.poly.getPath();
-		path.push( _location );
-		
 		var m_position = {
 			latitude : _this.position.latitude,
 			longitude : _this.position.longitude,
@@ -513,13 +560,37 @@ DOTC_TripLogger.prototype.TripLogTrail = function(){
 			watchID : ''
 		};
 		
-		if( _this.trip_logger.id > 0 ){
-			_this.trip_logger.coordinates.push( m_position );
-			_this.trip_logger.to_send.push( m_position );
+		_this.CurrentDistance = _this.DistanceTo(
+			{
+				_lat : _last.latitude,
+				_lon : _last.longitude
+			},
+			{
+				_lat : _this.position.latitude,
+				_lon : _this.position.longitude
+			}
+		);
+		
+		_this.CurrentSpeed = ( _this.CurrentDistance / ( +moment( m_position.current_dt ).subtract( _last.current_dt, 's' ).seconds() / 3600 ) ).toPrecisionFixed( 7 );
+		
+		if(
+			!isNaN( _this.CurrentSpeed )
+			&& _this.CurrentSpeed <= _this.SpeedLimit
+		){
+			var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
+			var path = _this.trip_logger.poly.getPath();
+			path.push( _location );
 			
-			// every minute
-			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
-				_this.SaveTripLog();
+			if( _this.trip_logger.id > 0 ){
+				m_position.estimated_distance = _this.CurrentDistance;
+				m_position.estimated_speed = _this.CurrentSpeed;
+				_this.trip_logger.coordinates.push( m_position );
+				_this.trip_logger.to_send.push( m_position );
+				
+				// every minute
+				if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
+					_this.SaveTripLog();
+				}
 			}
 		}
 		
@@ -590,7 +661,7 @@ DOTC_TripLogger.prototype.NewTripLogStart = function(){
 		m_position.watchID = '';
 		m_position.timestamp = moment().format( 'X' );
 		m_position.seconds = _this.running_time.seconds;
-		m_position.current_dt = moment().format( _this.dateformat );
+		m_position.current_dt = moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat );
 		_this.map.map.setCenter( _location );
 		_this.trip_logger.coordinates.push( m_position );
 		_this.trip_logger.to_send.push( m_position );
@@ -734,6 +805,9 @@ DOTC_TripLogger.prototype.WatchPosition = function(){
         _this.position.altitudeAccuracy = position.coords.altitudeAccuracy;
         _this.position.heading = position.coords.heading;
         _this.position.speed = position.coords.speed;
+		_this.position.timestamp = moment().format( 'X' );
+		_this.position.seconds = _this.running_time.seconds;
+		_this.position.current_dt = moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat );
 		
 		/*if( _this.trip_logger.id > 0 ){
 			var m_position = _this.position;
@@ -749,7 +823,7 @@ DOTC_TripLogger.prototype.WatchPosition = function(){
 DOTC_TripLogger.prototype.CurrentPosition = function(){
 	var _this = this;
 	this._timeoutPosition = setInterval(function(){
-		$( '#current_coordinates' ).html( _this.position.latitude + ', ' + _this.position.longitude + ' (' + _this.batchSentCtr + '/' + _this.batchSend.length + ')' );
+		$( '#current_coordinates' ).html( _this.position.latitude + ', ' + _this.position.longitude + ' (' + _this.batchSentCtr + '/' + _this.batchSendCtr + ') (' + _this.CurrentDistance + ' - ' + ( !isNaN( _this.CurrentSpeed ) ? _this.CurrentSpeed : '0.00' ) + 'kph)' );
 	
 		var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
 		if( _this.userMarker ){

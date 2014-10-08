@@ -79,7 +79,18 @@ var DOTC_TripLogger = function(){
 		zoomControlOptions : {
 			style : google.maps.ZoomControlStyle.SMALL,
 			position : google.maps.ControlPosition.LEFT_CENTER
-		}
+		},
+		styles : [
+			{
+				featureType: "poi",
+				elementType: "labels",
+				stylers: [
+					{
+						visibility : "off"
+					}
+				]
+			}
+		]
 	};
 	
 	this.trip_logger = {
@@ -123,6 +134,8 @@ var DOTC_TripLogger = function(){
 	this.DistanceLimit = 0.60;
 	this.CurrentDistance = 0;
 	this.CurrentSpeed = 0;
+	this.batchChunk = 0;
+	this.logs = '';
 }
 
 DOTC_TripLogger.prototype.NoInternetConnection = function( prompt ){
@@ -444,18 +457,20 @@ DOTC_TripLogger.prototype.StopTripLog = function(){
 		visibility : 'hidden'
 	});
 	this.BackToMap();
-	alert( 'Trip Logger Stopped' );
+	
+	alert( "Trip Logger Stopped" );
 }
 
 DOTC_TripLogger.prototype.BATCHSEND = function(){
 	var _this = this;
 	setInterval(function(){
-		if( _this.batchSend.length > 0 ){
+		if( _this.batchSentCtr < _this.batchSendCtr ){
 			// alert( _this.batchSend.length + ' - ' + _this.batchSend[Object.keys( _this.batchSend )[0]].length + ' ' + Object.keys( _this.batchSend ) );
 			if( _this.saveAjax ){
 				_this.saveAjax.abort();
 			}
-			var _iSend = _this.batchSend[Object.keys( _this.batchSend )[0]];
+			var _iSend = _this.batchSend[_this.batchSentCtr];
+			_this.batchChunk = _iSend.data.length;
 			
 			_this.saveAjax = $.post(
 				_this.node_ip + 'SaveTripLog',
@@ -466,12 +481,6 @@ DOTC_TripLogger.prototype.BATCHSEND = function(){
 					coordinates : _iSend.data
 				}, function( data ){
 					_this.batchSentCtr++;
-					
-					var _key = Object.keys( _this.batchSend )[0];
-					delete _this.batchSend[_key];
-					if( _this.batchSend.indexOf( _key ) > - 1 ){
-						_this.batchSend.splice( _this.batchSend.indexOf( _key ), 1 );
-					}
 				}
 			);
 		}
@@ -482,11 +491,6 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 	var _this = this;
 	var exitApp = typeof exitApp == 'undefined' ? false : true;
 	if( this.trip_logger.to_send.length > 0 && !_this.NoInternetConnection( false ) ){
-		/*if( this.saveAjax ){
-			this.trip_logger.send_limit += 60;
-			this.saveAjax.abort();
-		}*/
-		
 		_this.batchSend[_this.batchSendCtr] = {
 			data : _this.trip_logger.to_send,
 			id : _this.trip_logger.id,
@@ -495,29 +499,6 @@ DOTC_TripLogger.prototype.SaveTripLog = function( exitApp ){
 		};
 		_this.batchSendCtr++;
 		_this.trip_logger.to_send = [];
-	
-		/*this.saveAjax = $.post(
-			_this.node_ip + 'SaveTripLog',
-			{
-				id : _this.trip_logger.id,
-				user_id : _this.user.id,
-				trip_name : _this.trip_logger.name,
-				coordinates : _this.trip_logger.to_send
-			}, function( data ){
-				if( exitApp ){
-					_this.Loader();
-					if( navigator.app ){
-						navigator.app.exitApp();
-					} else if( navigator.device ) {
-						navigator.device.exitApp();
-					}
-					// _this.LoggerTicker( false );
-				}
-				_this.trip_logger.coordinates = [];
-				_this.trip_logger.to_send = [];
-				_this.trip_logger.send_limit = 60;
-			}
-		);*/
 	}
 }
 
@@ -543,81 +524,20 @@ DOTC_TripLogger.prototype.DistanceTo = function(point_a, point_b, poprecision) {
   return d.toPrecisionFixed( precision );
 }
 
+DOTC_TripLogger.prototype.GMAPS_DistanceBetween = function( point_a, point_b ){
+	var _coords1 = new google.maps.LatLng( point_a._lat, point_a._lon );
+	var _coords2 = new google.maps.LatLng( point_b._lat, point_b._lon );
+	
+	return ( google.maps.geometry.spherical.computeDistanceBetween( _coords1, _coords2 ) / 1000 ).toPrecisionFixed( 7 );
+}
+
 DOTC_TripLogger.prototype.TripLogTrail = function(){
 	var _this = this;
 	_this.trip_logger.IntervalTimeout = setInterval(function(){
-		var _last = _this.trip_logger.coordinates[( _this.trip_logger.coordinates.length - 1 )];
-		var m_position = {
-			latitude : _this.position.latitude,
-			longitude : _this.position.longitude,
-			accuracy : _this.position.accuracy,
-			altitudeAccuracy : _this.position.altitudeAccuracy,
-			heading : _this.position.heading,
-			speed : _this.position.speed,
-			timestamp : moment().format( 'X' ),
-			seconds : _this.running_time.seconds,
-			current_dt : moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat ),
-			watchID : ''
-		};
-		
-		_this.CurrentDistance = _this.DistanceTo(
-			{
-				_lat : _last.latitude,
-				_lon : _last.longitude
-			},
-			{
-				_lat : _this.position.latitude,
-				_lon : _this.position.longitude
-			}
-		);
-		
-		_this.CurrentSpeed = ( _this.CurrentDistance / ( +moment( m_position.current_dt ).subtract( _last.current_dt, 's' ).seconds() / 3600 ) ).toPrecisionFixed( 7 );
-		
-		if(
-			!isNaN( _this.CurrentSpeed )
-			&& _this.CurrentSpeed <= _this.SpeedLimit
-		){
-			var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
-			var path = _this.trip_logger.poly.getPath();
-			path.push( _location );
-			
-			if( _this.trip_logger.id > 0 ){
-				m_position.estimated_distance = _this.CurrentDistance;
-				m_position.estimated_speed = _this.CurrentSpeed;
-				_this.trip_logger.coordinates.push( m_position );
-				_this.trip_logger.to_send.push( m_position );
-				
-				// every minute
-				if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
-					_this.SaveTripLog();
-				}
-			}
+		// idle
+		if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
+			_this.SaveTripLog();
 		}
-		
-		/*navigator.geolocation.getCurrentPosition(function( position ){
-			var m_position = {
-				latitude : position.coords.latitude,
-				longitude : position.coords.longitude,
-				accuracy : position.coords.accuracy,
-				altitudeAccuracy : position.coords.altitudeAccuracy,
-				heading : position.coords.heading,
-				speed : position.coords.speed,
-				timestamp : moment().format( 'X' ),
-				seconds : _this.running_time.seconds,
-				current_dt : moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat ),
-				watchID : ''
-			};
-			
-			_this.trip_logger.coordinates.push( m_position );
-			_this.trip_logger.to_send.push( m_position );
-			
-			// every minute
-			if( _this.trip_logger.to_send.length >= _this.trip_logger.send_limit ){
-				_this.SaveTripLog();
-			}
-		}, function(){
-		
-		}, { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true });*/
 	}, 1000 );
 }
 
@@ -794,10 +714,64 @@ DOTC_TripLogger.prototype.MapResize = function(){
 }
 
 DOTC_TripLogger.prototype.WatchPosition = function(){
-	var options = { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true };
+	var options = { maximumAge: 1500, timeout: 3000, enableHighAccuracy: true };
 	var _this = this;
     this.position.watchID = navigator.geolocation.watchPosition( function( position ){
-		var _d = new Date();
+		var _now = {
+			timestamp : moment().format( 'X' ),
+			seconds : _this.running_time.seconds,
+			current_dt : moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat )
+		};
+	
+		if( _this.trip_logger.id > 0 ){
+			var _last = _this.trip_logger.coordinates[( _this.trip_logger.coordinates.length - 1 )];
+			
+			var m_position = {
+				latitude : position.coords.latitude,
+				longitude : position.coords.longitude,
+				altitude : position.coords.altitude,
+				accuracy : position.coords.accuracy,
+				altitudeAccuracy : position.coords.altitudeAccuracy,
+				heading : position.coords.heading,
+				speed : position.coords.speed,
+				timestamp : _now.timestamp,
+				seconds : _now.seconds,
+				current_dt : _now.current_dt,
+				watchID : ''
+			};
+			
+			_this.CurrentDistance = _this.DistanceTo(
+				{
+					_lat : _last.latitude,
+					_lon : _last.longitude
+				},
+				{
+					_lat : position.coords.latitude,
+					_lon : position.coords.longitude
+				}
+			);
+			
+			// old code
+			//_this.CurrentSpeed = ( _this.CurrentDistance / ( +moment( m_position.current_dt ).subtract( _last.current_dt, 's' ).seconds() / 3600 ) ).toPrecisionFixed( 7 );
+			
+			// new code
+			_this.CurrentSpeed = ( _this.CurrentDistance / ( moment( m_position.current_dt ).diff( moment( _last.current_dt ), 'seconds' ) / 3600 ) );
+			
+			if(
+				!isNaN( _this.CurrentSpeed )
+				&& _this.CurrentSpeed <= _this.SpeedLimit
+			){
+				var _location = new google.maps.LatLng( position.coords.latitude, position.coords.longitude );
+				var path = _this.trip_logger.poly.getPath();
+				path.push( _location );
+				
+				m_position.estimated_distance = _this.CurrentDistance;
+				m_position.estimated_speed = _this.CurrentSpeed;
+				_this.trip_logger.coordinates.push( m_position );
+				_this.trip_logger.to_send.push( m_position );
+			}
+		}
+		
 		_this.position.latitude = position.coords.latitude;
 		_this.position.longitude = position.coords.longitude;
 		_this.position.altitude = position.coords.altitude;
@@ -805,16 +779,9 @@ DOTC_TripLogger.prototype.WatchPosition = function(){
         _this.position.altitudeAccuracy = position.coords.altitudeAccuracy;
         _this.position.heading = position.coords.heading;
         _this.position.speed = position.coords.speed;
-		_this.position.timestamp = moment().format( 'X' );
-		_this.position.seconds = _this.running_time.seconds;
-		_this.position.current_dt = moment( _this.running_time.datetime ).add( _this.running_time.seconds, 's' ).format( _this.dateformat );
-		
-		/*if( _this.trip_logger.id > 0 ){
-			var m_position = _this.position;
-			m_position.watchID = '';
-			_this.trip_logger.coordinates.push( m_position );
-			_this.trip_logger.to_send.push( m_position );
-		}*/
+		_this.position.timestamp = _now.timestamp;
+		_this.position.seconds = _now.seconds;
+		_this.position.current_dt = _now.current_dt;
 	}, function(){
 		
 	}, options );
@@ -823,7 +790,7 @@ DOTC_TripLogger.prototype.WatchPosition = function(){
 DOTC_TripLogger.prototype.CurrentPosition = function(){
 	var _this = this;
 	this._timeoutPosition = setInterval(function(){
-		$( '#current_coordinates' ).html( _this.position.latitude + ', ' + _this.position.longitude + ' (' + _this.batchSentCtr + '/' + _this.batchSendCtr + ') (' + _this.CurrentDistance + ' - ' + ( !isNaN( _this.CurrentSpeed ) ? _this.CurrentSpeed : '0.00' ) + 'kph)' );
+		$( '#current_coordinates' ).html( _this.position.latitude + ', ' + _this.position.longitude + '<br />[' + _this.batchChunk + '] (' + _this.batchSentCtr + '/' + _this.batchSendCtr + ') (' + _this.CurrentDistance + ' - ' + ( !isNaN( _this.CurrentSpeed ) ? _this.CurrentSpeed : '0.00' ) + 'kph)' );
 	
 		var _location = new google.maps.LatLng( _this.position.latitude, _this.position.longitude );
 		if( _this.userMarker ){
@@ -1003,7 +970,7 @@ DOTC_TripLogger.prototype.strtotime = function(text, now) {
   // original by: Caio Ariede (http://caioariede.com)
   // improved by: Kevin van Zonneveld (http://kevin.vanzonneveld.net)
   // improved by: Caio Ariede (http://caioariede.com)
-  // improved by: A. Matías Quezada (http://amatiasq.com)
+  // improved by: A. Mat?as Quezada (http://amatiasq.com)
   // improved by: preuter
   // improved by: Brett Zamir (http://brett-zamir.me)
   // improved by: Mirko Faber
